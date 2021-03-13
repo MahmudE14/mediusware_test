@@ -8,14 +8,16 @@
 
 
     <div class="card">
-        <form action="" method="get" class="card-header">
+        <form action="" method="get" id="searchForm" class="card-header">
             <div class="form-row justify-content-between">
                 <div class="col-md-2">
                     <input type="text" name="title" placeholder="Product Title" class="form-control">
                 </div>
                 <div class="col-md-2">
                     <select name="variant" id="" class="form-control">
-
+                    @foreach($variants as $variant)
+                    <option value="{{ $variant->id }}">{{ $variant->title }}</option>
+                    @endforeach
                     </select>
                 </div>
 
@@ -50,33 +52,51 @@
                     </tr>
                     </thead>
 
-                    <tbody>
+                    <tbody id="product_container">
 
-                    <tr>
-                        <td>1</td>
-                        <td>T-Shirt <br> Created at : 25-Aug-2020</td>
-                        <td>Quality product in low cost</td>
-                        <td>
-                            <dl class="row mb-0" style="height: 80px; overflow: hidden" id="variant">
+                    @if($products)
+                        @foreach ($products as $product)
 
-                                <dt class="col-sm-3 pb-0">
-                                    SM/ Red/ V-Nick
-                                </dt>
-                                <dd class="col-sm-9">
-                                    <dl class="row mb-0">
-                                        <dt class="col-sm-4 pb-0">Price : {{ number_format(200,2) }}</dt>
-                                        <dd class="col-sm-8 pb-0">InStock : {{ number_format(50,2) }}</dd>
-                                    </dl>
-                                </dd>
-                            </dl>
-                            <button onclick="$('#variant').toggleClass('h-auto')" class="btn btn-sm btn-link">Show more</button>
-                        </td>
-                        <td>
-                            <div class="btn-group btn-group-sm">
-                                <a href="{{ route('product.edit', 1) }}" class="btn btn-success">Edit</a>
-                            </div>
-                        </td>
-                    </tr>
+                        <tr>
+                            <td>{{ $loop->iteration }}</td>
+                            <td>{{ $product->title }} <br> Created at : {{ date('d-M-Y', strtotime($product->created_at)) }}</td>
+                            <td>{{ $product->description }}</td>
+                            <td>
+                                <dl class="row mb-0" style="height: 80px; overflow: hidden" id="variant">
+
+                                    <dt class="col-sm-3 pb-0">
+                                        @if($product->variantPrices)
+                                            @foreach($product->variantPrices as $price)
+                                                {{ $price->variant }}
+                                            @endforeach
+                                        @endif
+                                    </dt>
+                                    <dd class="col-sm-9">
+                                        <dl class="row mb-0">
+                                            @if($product->variantPrices)
+                                                @foreach($product->variantPrices as $price)
+                                                    <dt class="col-sm-4 pb-0">Price : {{ number_format( $price->price, 2) }}</dt>
+                                                
+                                                    @if($price->stock)
+                                                    <dd class="col-sm-8 pb-0">InStock : {{ number_format($price->stock, 2) }}</dd>
+                                                    @else
+                                                    <dd class="col-sm-8 pb-0"> OutOfStock</dd>
+                                                    @endif
+                                                @endforeach
+                                            @endif
+                                        </dl>
+                                    </dd>
+                                </dl>
+                                <button onclick="$('#variant').toggleClass('h-auto')" class="btn btn-sm btn-link">Show more</button>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ route('product.edit', 1) }}" class="btn btn-success">Edit</a>
+                                </div>
+                            </td>
+                        </tr>
+                        @endforeach
+                    @endif
 
                     </tbody>
 
@@ -88,13 +108,72 @@
         <div class="card-footer">
             <div class="row justify-content-between">
                 <div class="col-md-6">
-                    <p>Showing 1 to 10 out of 100</p>
+                    <p>
+                        Showing {{ ($products->currentpage()-1) * $products->perpage() + 1 }} to 
+                        {{ $products->currentpage() * $products->perpage() }} out of {{ $products->total() }}
+                    </p>
                 </div>
                 <div class="col-md-2">
-
+                    {{ $products->links() }}
                 </div>
             </div>
         </div>
     </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+
+    <script>
+    document.getElementById("searchForm").addEventListener("submit", search);
+
+    function search (event) {
+        event.preventDefault();
+
+        let params = {
+            title: document.querySelector('input[name=title').value,
+            variant: document.querySelector('select[name=variant').value,
+            price_from: document.querySelector('input[name=price_from').value,
+            price_to: document.querySelector('input[name=price_to').value,
+            date: document.querySelector('input[name=date').value,
+            _token: '{{ csrf_token() }}'
+        }
+
+        $.post('/filter', params).then(data => {
+            let count = 0;
+            let html = ``;
+
+            $.map(data, (val, key) => {
+                let entry_date = new Date(val['created_at']);
+                let month = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul","Aug", "Sep", "Oct", "Nov", "Dec"];
+                html += `
+                        <tr>
+                            <td>${++count}</td>
+                            <td>${val['title']} <br> Created at : ${entry_date.getDate()}-${month[entry_date.getMonth()]}-${entry_date.getFullYear()}</td>
+                            <td>${val['description']}</td>
+                            <td>
+                                <dl class="row mb-0" style="height: 80px; overflow: hidden" id="variant">
+
+                                    <dt class="col-sm-3 pb-0">
+                                        Price: 
+                                    </dt>
+                                    <dd class="col-sm-9">
+                                        <dl class="row mb-0">
+                                            Stock info
+                                        </dl>
+                                    </dd>
+                                </dl>
+                                <button onclick="$('#variant').toggleClass('h-auto')" class="btn btn-sm btn-link">Show more</button>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ URL('product') }}/${val['id']}/edit" class="btn btn-success">Edit</a>
+                                </div>
+                            </td>
+                        </tr>`;
+            });
+
+            $('#product_container').val(html)
+        });
+    }
+    </script>
 
 @endsection
